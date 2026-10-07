@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-08  
 **Source:** `ab9c10070a9982c546f13c1ef6356a99685b9f6d` in `nsb/quarel-m00-baseline`  
-**Gate:** independent integrated review accepted; local verification complete. M01 remains open because remote CI for this branch has not run. All current deployment manifests parse with both Docker Compose v2.39.3 and the selected `podman-compose` 1.6.0 provider; actual Podman runtime compatibility remains unverified and is required at M17/M19.
+**Gate:** independent integrated review accepted; local verification complete. M01 remains open because remote CI has not run. Branch `nsb/quarel-m00-baseline` is published to `SorbetUP/len-scape-` at `538e75ea6912cf5cb848786f5030566583b508d4`. That repository's default branch (`main_slack`) does not contain this CI workflow; the workflow is active on `anlekg/quarel:main`, where this branch and a pull request do not exist. Running the upstream CI requires a draft cross-repository PR from `SorbetUP/len-scape-`; user approval is pending. All current deployment manifests parse with both Docker Compose v2.39.3 and the selected `podman-compose` 1.6.0 provider; actual Podman runtime compatibility remains unverified and is required at M17/M19.
 
 ## Implementation
 
