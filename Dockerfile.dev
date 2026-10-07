@@ -1,0 +1,33 @@
+# Multi-arch Linux Go and Node development/test environment.
+FROM golang:1.27-bookworm@sha256:8d48e12ec56735e9358640898b9d9b9fcca110612ed8a5567438c0a1baa24e66 AS go
+FROM livekit/livekit-server:v1.13.7@sha256:6fd3b7088874c4d119160dd688798dfec852bc014786d392caad15f6f63912a3 AS livekit
+
+FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+COPY --from=go /usr/local/go /usr/local/go
+COPY --from=livekit /livekit-server /usr/local/bin/livekit-server
+ENV PATH=/usr/local/go/bin:$PATH \
+    HOME=/home/dev \
+    GOPATH=/home/dev/go \
+    GOCACHE=/home/dev/.cache/go-build \
+    ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    QUAREL_LIVEKIT_BIN=/usr/local/bin/livekit-server
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential ca-certificates curl python3-cryptography sqlite3 \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --create-home --uid 10001 --shell /bin/bash dev \
+ && mkdir -p /workspace/bin \
+ && chown -R 10001:10001 /workspace /home/dev
+WORKDIR /workspace
+COPY go.mod go.sum ./
+COPY client/package.json client/package-lock.json ./client/
+COPY site/package.json site/package-lock.json ./site/
+RUN chown -R 10001:10001 /workspace /home/dev
+USER 10001:10001
+RUN go mod download \
+ && cd client && npm ci \
+ && cd ../site && npm ci
+COPY --chown=10001:10001 . .
+COPY licenses/livekit/LICENSE licenses/livekit/NOTICE /licenses/livekit/
+RUN mkdir -p /workspace/bin
+CMD ["sleep", "infinity"]

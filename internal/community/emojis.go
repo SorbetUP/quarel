@@ -12,7 +12,6 @@ import (
 	"strconv"
 
 	"github.com/anlekg/quarel/internal/diskspace"
-	"github.com/anlekg/quarel/internal/secret"
 )
 
 // Custom emojis (P2): small images (PNG, GIF, WebP; maxEmojiBytes) named by
@@ -104,7 +103,7 @@ func (s *Server) handleCreateEmoji(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	e := emojiJSON{ID: secret.NewID(), Name: name}
+	e := emojiJSON{ID: s.ids.NewID(), Name: name}
 	dir := filepath.Join(s.cfg.DataDir, emojiDir)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		writeErr(w, r, err)

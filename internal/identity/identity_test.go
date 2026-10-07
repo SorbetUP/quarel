@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anlekg/quarel/internal/platform"
 	"github.com/anlekg/quarel/pkg/idtoken"
 )
 
@@ -195,6 +197,23 @@ func TestRegistrationAndLogin(t *testing.T) {
 
 	e.expect(204, "", e.call("POST", "/v1/auth/logout", lr.SessionToken, nil, nil))
 	e.expect(401, "unauthorized", e.call("GET", "/v1/me", lr.SessionToken, nil, nil))
+}
+
+func TestIdentityUsesOrdinaryIDGeneratorButKeepsSessionTokenSecretSeparate(t *testing.T) {
+	e := newEnv(t)
+	next := 0
+	e.srv.ids = platform.IDGeneratorFunc(func() string {
+		next++
+		return fmt.Sprintf("ordinary-%d", next)
+	})
+
+	lr, _ := e.registerVerified("ids@example.com", "ids", "correct horse battery")
+	if lr.User.ID != "ordinary-1" || lr.SessionID != "ordinary-2" {
+		t.Fatalf("registered IDs = user:%q session:%q, want ordinary generator values", lr.User.ID, lr.SessionID)
+	}
+	if lr.SessionToken == "" || lr.SessionToken == lr.SessionID {
+		t.Fatal("bearer session token must remain separate secret material")
+	}
 }
 
 func TestEmailCodeAttemptsAndExpiry(t *testing.T) {

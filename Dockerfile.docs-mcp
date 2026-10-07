@@ -6,11 +6,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/anlekg/quarel/internal/backup.Release=${VERSION}" -o /out/quarel-docs-mcp ./cmd/quarel-docs-mcp
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/anlekg/quarel/internal/backup.Release=${VERSION}" -o /out/quarel-docs-mcp ./cmd/quarel-docs-mcp \
+ && CGO_ENABLED=0 go build -trimpath -o /out/quarel-probe ./cmd/quarel-probe
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /out/quarel-docs-mcp /quarel-docs-mcp
+COPY --from=build /out/quarel-probe /quarel-probe
+COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /licenses/quarel/
 COPY site/src/content/docs /docs
 EXPOSE 8095
 ENTRYPOINT ["/quarel-docs-mcp"]
 CMD ["-docs", "/docs", "-addr", ":8095"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/quarel-probe", "http://127.0.0.1:8095/health"]

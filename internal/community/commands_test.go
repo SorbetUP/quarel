@@ -21,7 +21,9 @@ func (c *community) gatewayEvents(ctx context.Context, token string) func(t stri
 		c.t.Fatal(err)
 	}
 	c.t.Cleanup(func() { conn.CloseNow() })
-	wsjson.Write(ctx, conn, map[string]string{"op": "auth", "token": token})
+	if err := wsjson.Write(ctx, conn, map[string]string{"op": "auth", "token": token}); err != nil {
+		c.t.Fatal(err)
+	}
 	return func(t string) json.RawMessage {
 		c.t.Helper()
 		for {
@@ -44,9 +46,6 @@ func TestSlashCommands(t *testing.T) {
 	gen := c.channelID(c.owner, "général")
 	var bot botJSON
 	c.expect(201, "", c.call("POST", "/v1/bots", c.owner, map[string]any{"name": "Dés"}, &bot))
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	decl := []map[string]any{{
 		"name": "lancer", "description": "Lance des dés",
 		"options": []map[string]any{
@@ -59,7 +58,11 @@ func TestSlashCommands(t *testing.T) {
 	c.expect(400, "invalid_command", c.call("PUT", "/v1/bots/@me/commands", bot.Token, []map[string]any{{"name": "Majuscule"}}, nil))
 	c.expect(400, "invalid_command", c.call("PUT", "/v1/bots/@me/commands", bot.Token, []map[string]any{{"name": "x", "options": []map[string]any{
 		{"name": "a", "type": "string"}, {"name": "b", "type": "string", "required": true}}}}, nil))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	bobEvents := c.gatewayEvents(ctx, c.tok("bob"))
+	// Wait until this client is registered before causing the update event.
+	bobEvents("READY")
 	c.expect(200, "", c.call("PUT", "/v1/bots/@me/commands", bot.Token, decl, nil))
 	var update []botCommand
 	json.Unmarshal(bobEvents("COMMANDS_UPDATE"), &update)

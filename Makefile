@@ -6,7 +6,7 @@ export PATH := $(HOME)/.local/go/bin:$(HOME)/.local/bin:$(PATH)
 -include local.mk
 export QUAREL_UPDATES_DIR QUAREL_DOWNLOADS_DIR
 
-.PHONY: build test test-race vet run-identity run-server docker-identity docker-server e2e-voice e2e-dm e2e-security e2e-acme e2e-messages e2e-moderation e2e-accounts e2e-dm-groups e2e-calls e2e-ops windows client-interop client-install client-dev client-build client-test e2e-client windows-release site-dev site-build docs-mcp discord-import-test clean
+.PHONY: build test test-race vet run-identity run-server docker-identity docker-server e2e-voice e2e-voice-docker e2e-servers e2e-dm e2e-security e2e-acme e2e-messages e2e-moderation e2e-accounts e2e-dm-groups e2e-calls e2e-ops windows client-interop client-install client-dev client-build client-test e2e-client windows-release site-dev site-build docs-mcp discord-import-test clean
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/anlekg/quarel/internal/backup.Release=$(VERSION)
@@ -43,10 +43,9 @@ docker-server:
 clean:
 	rm -rf bin
 
-# End-to-end voice test with real browsers (installs Playwright + Chromium on first run).
-e2e-voice: build
-	cd test/e2e && [ -d node_modules ] || (npm install --silent && npx playwright install chromium)
-	test/e2e/voice.sh
+# End-to-end voice scenario inside a Linux/amd64 Docker container with real browsers.
+e2e-voice e2e-voice-docker:
+	test/e2e/voice-docker.sh
 
 # End-to-end encrypted DM scenario (Identity service + quarelctl).
 e2e-dm: build
@@ -79,6 +78,18 @@ e2e-calls: build
 # P1 scenario: live backups and restore of both services.
 e2e-ops: build
 	test/e2e/ops.sh
+
+# Server E2E suite used by CI and the versioned Docker dev image.
+e2e-servers: build
+	test/e2e/dm.sh
+	test/e2e/dm-groups.sh
+	test/e2e/messages.sh
+	test/e2e/moderation.sh
+	test/e2e/accounts.sh
+	test/e2e/security.sh
+	test/e2e/ops.sh
+	test/e2e/calls.sh
+	$(MAKE) discord-import-test
 
 # HTTPS through ACME (Let's Encrypt protocol) against Pebble in Docker.
 e2e-acme: build

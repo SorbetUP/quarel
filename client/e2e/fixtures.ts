@@ -156,7 +156,7 @@ export class Ctl {
     try {
       return execFileSync(join(repo, 'bin', 'quarelctl'), ['-s', this.identity.url, '-p', profile, ...args], {
         cwd: this.dir,
-        env: { ...process.env, XDG_CONFIG_HOME: join(this.dir, 'cfg'), QUAREL_PASSWORD: 'motdepasse-solide' },
+        env: { ...process.env, HOME: this.dir, XDG_CONFIG_HOME: join(this.dir, 'cfg'), QUAREL_PASSWORD: 'motdepasse-solide' },
         encoding: 'utf8',
       })
     } catch (e) {
@@ -169,7 +169,7 @@ export class Ctl {
   listen(profile: string, ...args: string[]) {
     const p = spawn(join(repo, 'bin', 'quarelctl'), ['-s', this.identity.url, '-p', profile, ...args], {
       cwd: this.dir,
-      env: { ...process.env, XDG_CONFIG_HOME: join(this.dir, 'cfg'), QUAREL_PASSWORD: 'motdepasse-solide' },
+      env: { ...process.env, HOME: this.dir, XDG_CONFIG_HOME: join(this.dir, 'cfg'), QUAREL_PASSWORD: 'motdepasse-solide' },
     })
     let out = ''
     p.stdout.on('data', (d) => (out += d))

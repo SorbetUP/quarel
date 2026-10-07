@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/anlekg/quarel/internal/platform"
 	"github.com/anlekg/quarel/internal/sqlitedb"
 )
 
@@ -58,6 +59,21 @@ func TestWebhooks(t *testing.T) {
 	c.expect(200, "", c.call("GET", fmt.Sprint("/v1/channels/", gen, "/messages"), c.tok("bob"), nil, &hist))
 	if last := hist[len(hist)-1]; last.Webhook == nil || last.Webhook.Name != "Intégration continue" {
 		t.Fatalf("after deletion = %+v", last)
+	}
+}
+
+func TestWebhookUsesInjectedOrdinaryIDsButKeepsTokenSecretSeparate(t *testing.T) {
+	c := newCommunity(t, "alice")
+	c.srv.ids = platform.IDGeneratorFunc(func() string { return "ordinary-id" })
+	channelID := c.channelID(c.owner, "général")
+	var webhook webhookJSON
+	c.expect(201, "", c.call("POST", fmt.Sprintf("/v1/channels/%d/webhooks", channelID), c.owner,
+		map[string]string{"name": "CI"}, &webhook))
+	if webhook.ID != "ordinary-id" {
+		t.Fatalf("webhook id = %q, want injected ordinary ID", webhook.ID)
+	}
+	if webhook.Token == "" || webhook.Token == webhook.ID {
+		t.Fatalf("webhook bearer token must remain separate secret material: id=%q token=%q", webhook.ID, webhook.Token)
 	}
 }
 

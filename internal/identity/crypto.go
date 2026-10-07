@@ -74,7 +74,6 @@ var dummyHash = sync.OnceValue(func() string {
 })
 
 var (
-	newID     = secret.NewID
 	newSecret = secret.NewToken
 	sha256Hex = secret.SHA256Hex
 )

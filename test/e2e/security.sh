@@ -6,7 +6,8 @@ set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd); B=$REPO/bin
 D=$(mktemp -d); PIDS=()
 trap 'kill "${PIDS[@]}" 2>/dev/null; rm -rf "$D"' EXIT
-export XDG_CONFIG_HOME=$D/cfg QUAREL_PASSWORD=motdepasse-solide
+# Keep both Unix and macOS config locations inside the test's temporary directory.
+export HOME=$D XDG_CONFIG_HOME=$D/cfg QUAREL_PASSWORD=motdepasse-solide
 start_identity() { # port, extra env...
   local port=$1; shift
   env "$@" QUAREL_ADDR=127.0.0.1:$port QUAREL_ISSUER=localhost:$port QUAREL_DATA_DIR=$D/id$port $B/quarel-identity >> $D/id$port.log 2>&1 &
@@ -36,12 +37,17 @@ expect "sans sauvegarde, l'état le signale" "$(Q alice recovery-status)" "Aucun
 SETUP=$(Q alice recovery-setup)
 expect "phrase générée et sauvegarde envoyée" "$SETUP" "Sauvegarde chiffrée envoyée"
 PHRASE=$(grep -o '[0-9]\+\. [^ ]\+' <<<"$SETUP" | sort -n | awk '{print $2}' | tr '\n' ' ')
-[ "$(wc -w <<<"$PHRASE")" = 12 ] && echo "✔ 12 mots affichés" || { echo "✘ phrase illisible : $PHRASE"; FAIL=1; }
+[ "$(wc -w <<<"$PHRASE" | tr -d '[:space:]')" = 12 ] && echo "✔ 12 mots affichés" || { echo "✘ phrase illisible : $PHRASE"; FAIL=1; }
 Q alice dm bob "Message trois, après la création de la phrase" >/dev/null
 expect "sauvegarde active" "$(Q alice recovery-status)" "Sauvegarde active"
 expect "une seconde phrase exige --replace" "$(Q alice recovery-setup)" "--replace"
 
-rm -f "$D"/cfg/quarelctl/alice.*   # alice loses her only device
+if [ "$(uname -s)" = Darwin ]; then
+  PROFILE_DIR="$HOME/Library/Application Support/quarelctl"
+else
+  PROFILE_DIR="$XDG_CONFIG_HOME/quarelctl"
+fi
+rm -f "$PROFILE_DIR"/alice.*   # alice loses her only device
 Q alice login alice "nouveau-pc" >/dev/null
 expect "le nouvel appareil n'est pas validé" "$(Q alice e2e)" "en attente de validation"
 expect "une faute de frappe est détectée" "$(Q alice recovery-restore ${PHRASE/ /x })" "phrase invalide"

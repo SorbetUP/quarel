@@ -16,7 +16,6 @@ import (
 	"unicode"
 
 	"github.com/anlekg/quarel/internal/diskspace"
-	"github.com/anlekg/quarel/internal/secret"
 )
 
 // Attachments are uploaded first (POST /v1/channels/{id}/attachments), then
@@ -126,7 +125,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	id := secret.NewID()
+	id := s.ids.NewID()
 	path := filepath.Join(s.attachmentsDir(), id)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {

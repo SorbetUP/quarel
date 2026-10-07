@@ -219,7 +219,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	id := newID()
+	id := s.ids.NewID()
 	path := filepath.Join(s.filesDir(), id)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {

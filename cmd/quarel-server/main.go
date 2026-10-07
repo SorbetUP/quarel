@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/anlekg/quarel/internal/adapters/ids"
 	"github.com/anlekg/quarel/internal/adminui"
 	"github.com/anlekg/quarel/internal/backup"
 	"github.com/anlekg/quarel/internal/community"
@@ -138,7 +139,7 @@ func serve(ctx context.Context, ready func(), state *live, out io.Writer) error 
 		return fmt.Errorf("QUAREL_ADDR: %w", err)
 	}
 	port, _ := strconv.Atoi(portStr)
-	srv, err := community.Open(cfg)
+	srv, err := community.OpenWithIDGenerator(cfg, ids.Generator{})
 	if err != nil {
 		return err
 	}

@@ -196,7 +196,7 @@ func (s *Server) handleOpenDM(w http.ResponseWriter, r *http.Request) {
 	var convID string
 	err = s.db.QueryRowContext(ctx, `SELECT conversation_id FROM direct_pairs WHERE user_a = ? AND user_b = ?`, a, b).Scan(&convID)
 	if errors.Is(err, sql.ErrNoRows) {
-		convID = newID()
+		convID = s.ids.NewID()
 		now := s.now().Unix()
 		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
@@ -267,7 +267,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request, userIDs []s
 		writeErr(w, r, errf(http.StatusBadRequest, "invalid_members", "a group has 2 to %d members", s.cfg.GroupMaxMembers))
 		return
 	}
-	convID, now := newID(), s.now().Unix()
+	convID, now := s.ids.NewID(), s.now().Unix()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		writeErr(w, r, err)

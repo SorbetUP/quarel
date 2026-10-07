@@ -7,13 +7,17 @@ RUN go mod download
 COPY . .
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/anlekg/quarel/internal/backup.Release=${VERSION}" -o /out/quarel-identity ./cmd/quarel-identity \
+ && CGO_ENABLED=0 go build -trimpath -o /out/quarel-probe ./cmd/quarel-probe \
  && mkdir -p /out/data
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /out/quarel-identity /quarel-identity
+COPY --from=build /out/quarel-probe /quarel-probe
+COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /licenses/quarel/
 COPY --from=build --chown=65532:65532 /out/data /data
 ENV QUAREL_ADDR=:8080 QUAREL_DATA_DIR=/data
 VOLUME /data
 # 8081/tcp: administration page (local network only, password).
 EXPOSE 8080 8081 3478/udp
 ENTRYPOINT ["/quarel-identity"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 CMD ["/quarel-probe", "identity"]

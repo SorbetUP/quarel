@@ -48,7 +48,7 @@ func (s *Server) handleCreateBot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	m := &member{ID: secret.NewID(), Issuer: botIssuer, Subject: secret.NewID(), Handle: name, JoinedAt: s.nowMs(), Bot: true}
+	m := &member{ID: s.ids.NewID(), Issuer: botIssuer, Subject: s.ids.NewID(), Handle: name, JoinedAt: s.nowMs(), Bot: true}
 	token := botTokenPrefix + secret.NewToken()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

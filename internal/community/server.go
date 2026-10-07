@@ -18,6 +18,7 @@ import (
 
 	"github.com/anlekg/quarel/internal/httpapi"
 	"github.com/anlekg/quarel/internal/netdiag"
+	"github.com/anlekg/quarel/internal/platform"
 	"github.com/anlekg/quarel/internal/ratelimit"
 	"github.com/anlekg/quarel/internal/realtime"
 	"github.com/anlekg/quarel/internal/secret"
@@ -39,7 +40,8 @@ type Server struct {
 	keys   KeySource
 	nonces *nonceStore
 	hub    *realtime.Hub
-	now    func() time.Time
+	now    platform.Clock
+	ids    platform.IDGenerator
 
 	voiceOpts *VoiceOptions  // nil: voice disabled
 	voice     *voiceRegistry // who is in which voice channel
@@ -62,6 +64,11 @@ func ServerID(pub ed25519.PublicKey) string { return tlsbind.ServerID(pub) }
 
 // Open prepares the data directory, database, server key and first-start content.
 func Open(cfg Config) (*Server, error) {
+	return OpenWithIDGenerator(cfg, platform.IDGeneratorFunc(secret.NewID))
+}
+
+// OpenWithIDGenerator opens the service and injects its ordinary-ID adapter.
+func OpenWithIDGenerator(cfg Config, ids platform.IDGenerator) (*Server, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return nil, err
 	}
@@ -74,7 +81,7 @@ func Open(cfg Config) (*Server, error) {
 		db.Close()
 		return nil, err
 	}
-	s := New(cfg, db, key, NewHTTPKeySource())
+	s := NewWithIDGenerator(cfg, db, key, NewHTTPKeySource(), ids)
 	if err := s.seed(context.Background()); err != nil {
 		db.Close()
 		return nil, err
@@ -84,6 +91,15 @@ func Open(cfg Config) (*Server, error) {
 
 // New builds a Server from already-opened dependencies. Call seed before use.
 func New(cfg Config, db *sql.DB, key ed25519.PrivateKey, keys KeySource) *Server {
+	return NewWithIDGenerator(cfg, db, key, keys, platform.IDGeneratorFunc(secret.NewID))
+}
+
+// NewWithIDGenerator builds a Server with an injectable ordinary-ID source.
+// Cryptographic tokens and setup codes continue to use their dedicated CSPRNG.
+func NewWithIDGenerator(cfg Config, db *sql.DB, key ed25519.PrivateKey, keys KeySource, ids platform.IDGenerator) *Server {
+	if ids == nil {
+		ids = platform.IDGeneratorFunc(secret.NewID)
+	}
 	s := &Server{
 		cfg:     cfg,
 		db:      db,
@@ -91,7 +107,8 @@ func New(cfg Config, db *sql.DB, key ed25519.PrivateKey, keys KeySource) *Server
 		keys:    keys,
 		nonces:  newNonceStore(),
 		hub:     realtime.NewHub(),
-		now:     time.Now,
+		now:     platform.Clock(time.Now),
+		ids:     ids,
 		key:     key,
 		enc:     deriveEncKey(key),
 		proxies: cfg.TrustedProxies,

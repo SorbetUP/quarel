@@ -1,0 +1,86 @@
+name: quarel
+
+services:
+  identity:
+    image: localhost/quarel-identity:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile.identity
+    environment:
+      QUAREL_ADDR: :8080
+      QUAREL_ISSUER: identity:8080
+      QUAREL_DATA_DIR: /data
+      QUAREL_TLS: "off"
+      QUAREL_UPNP: "off"
+      QUAREL_TURN: "off"
+      QUAREL_ADMIN_ADDR: "off"
+    volumes:
+      - identity-data:/data
+    ports:
+      - "127.0.0.1:18080:8080"
+    restart: unless-stopped
+
+  server:
+    image: localhost/quarel-server:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile.server
+    environment:
+      QUAREL_ADDR: :8090
+      QUAREL_DATA_DIR: /data
+      QUAREL_TRUSTED_ISSUERS: identity:8080
+      QUAREL_TLS: "off"
+      QUAREL_UPNP: "off"
+      QUAREL_VOICE: "off"
+      QUAREL_ADMIN_ADDR: "off"
+    volumes:
+      - server-data:/data
+    ports:
+      - "127.0.0.1:18090:8090"
+    depends_on:
+      identity:
+        condition: service_healthy
+    restart: unless-stopped
+
+  docs-mcp:
+    image: localhost/quarel-docs-mcp:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile.docs-mcp
+    ports:
+      - "127.0.0.1:18095:8095"
+    healthcheck:
+      test: ["CMD", "/quarel-probe", "http://127.0.0.1:8095/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  site:
+    image: localhost/quarel-site:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile.site
+    ports:
+      - "127.0.0.1:18000:8080"
+    healthcheck:
+      test: ["CMD", "/quarel-probe", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  dev:
+    image: localhost/quarel-dev:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile.dev
+    profiles: [dev]
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+
+volumes:
+  identity-data:
+  server-data:

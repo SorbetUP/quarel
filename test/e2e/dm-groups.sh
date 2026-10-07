@@ -7,7 +7,7 @@ set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd); B=$REPO/bin
 D=$(mktemp -d); PIDS=()
 trap 'kill "${PIDS[@]}" 2>/dev/null; rm -rf "$D"' EXIT
-export XDG_CONFIG_HOME=$D/cfg QUAREL_PASSWORD=motdepasse-solide
+export HOME=$D XDG_CONFIG_HOME=$D/cfg QUAREL_PASSWORD=motdepasse-solide
 QUAREL_RATE_LIMITS=off QUAREL_ADDR=127.0.0.1:28080 QUAREL_ISSUER=localhost:28080 QUAREL_DATA_DIR=$D/id QUAREL_DM_FILE_MAX_MB=1 $B/quarel-identity > $D/id.log 2>&1 & PIDS+=($!)
 sleep 0.5
 Q() { local p=$1; shift; (cd $D && $B/quarelctl -s http://127.0.0.1:28080 -p "$p" "$@" 2>&1); }
@@ -105,9 +105,9 @@ sleep 0.5
 expect "bob l'a reçu en direct" "$(cat $D/bob.log)" "fichier reçu en direct"
 P=$(grep -o '#[0-9]*' <<<"$OUT" | head -1 | tr -d '#')
 expect "bob l'enregistre sans le serveur" "$(Q bob dm-download Tarot $P plan-bob.bin)" "depuis cet appareil"
-[ "$(ls $D/id/dm-files | wc -l)" = $((N0 + 1)) ] && echo "✔ une seule copie serveur de plus, pour l'appareil absent" || { echo "✘ copies serveur : $(ls $D/id/dm-files | wc -l)"; FAIL=1; }
+[ "$(ls $D/id/dm-files | wc -l | tr -d '[:space:]')" = $((N0 + 1)) ] && echo "✔ une seule copie serveur de plus, pour l'appareil absent" || { echo "✘ copies serveur : $(ls $D/id/dm-files | wc -l)"; FAIL=1; }
 Q dave dm-history Tarot >/dev/null   # dave comes online: gets the copy, which is then deleted
-[ "$(ls $D/id/dm-files | wc -l)" = 0 ] && echo "✔ copies serveur effacées dès que dave les a" || { echo "✘ copie serveur conservée"; FAIL=1; }
+[ "$(ls $D/id/dm-files | wc -l | tr -d '[:space:]')" = 0 ] && echo "✔ copies serveur effacées dès que dave les a" || { echo "✘ copie serveur conservée"; FAIL=1; }
 expect "dave l'a bien" "$(Q dave dm-download Tarot $P plan-dave.bin)" "depuis cet appareil"
 cmp -s $D/plan.bin $D/plan-dave.bin && echo "✔ fichier identique" || { echo "✘ fichier différent"; FAIL=1; }
 head -c 1500000 /dev/urandom > $D/video.bin   # over the server limit (1 MB here)
@@ -117,7 +117,7 @@ V=$(grep -o '#[0-9]*' <<<"$OUT" | head -1 | tr -d '#')
 sleep 0.5
 expect "dave le récupère plus tard, en direct depuis un autre membre en ligne" "$(Q dave dm-download Tarot $V video-dave.bin)" "en direct depuis un autre appareil"
 cmp -s $D/video.bin $D/video-dave.bin && echo "✔ gros fichier identique" || { echo "✘ gros fichier différent"; FAIL=1; }
-[ "$(ls $D/id/dm-files | wc -l)" = 0 ] && echo "✔ le gros fichier n'est jamais passé par le serveur" || { echo "✘ gros fichier stocké"; FAIL=1; }
+[ "$(ls $D/id/dm-files | wc -l | tr -d '[:space:]')" = 0 ] && echo "✔ le gros fichier n'est jamais passé par le serveur" || { echo "✘ gros fichier stocké"; FAIL=1; }
 echo "## Messages éphémères"
 expect "dave règle 1 heure pour tout le groupe" "$(Q dave dm-timer Tarot 1h)" "messages éphémères : 1 heure"
 expect "bob voit le réglage" "$(Q bob dm-history Tarot)" "dave : ⏱ messages éphémères : 1 heure"

@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/anlekg/quarel/internal/adapters/ids"
 	"github.com/anlekg/quarel/internal/adminui"
 	"github.com/anlekg/quarel/internal/backup"
 	"github.com/anlekg/quarel/internal/identity"
@@ -125,7 +126,7 @@ func serve(ctx context.Context, ready func(), state *live) error {
 	if err != nil {
 		return err
 	}
-	srv, err := identity.Open(cfg)
+	srv, err := identity.OpenWithIDGenerator(cfg, ids.Generator{})
 	if err != nil {
 		return err
 	}

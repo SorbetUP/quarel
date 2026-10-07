@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+# Linux runner for the existing M00 voice E2E. Playwright and LiveKit are amd64;
+# Buildx cross-compiles the Go services on the builder's native architecture.
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS build
+ARG TARGETOS TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/quarel-identity ./cmd/quarel-identity \
+ && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/quarel-server ./cmd/quarel-server \
+ && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/quarelctl ./cmd/quarelctl
+
+# Use the immutable amd64 manifest for the LiveKit release used in production.
+FROM livekit/livekit-server:v1.13.7@sha256:5d3dcc475d064536d9948ebe4eeab8e3b24d6f07a46f6d71a3415a2901bbdc52 AS livekit
+
+# Playwright's browser and Linux system dependencies match the locked npm version.
+FROM mcr.microsoft.com/playwright:v1.63.0-noble@sha256:bc6ab0d6d44ff4826e4cb8c1e6d801e185bfc42bb0753f8e2a30efc70db054c7
+WORKDIR /workspace
+COPY . .
+COPY --from=build /out/quarel-identity /workspace/bin/quarel-identity
+COPY --from=build /out/quarel-server /workspace/bin/quarel-server
+COPY --from=build /out/quarelctl /workspace/bin/quarelctl
+COPY --from=livekit /livekit-server /usr/local/bin/livekit-server
+RUN cd test/e2e && npm ci --no-audit --no-fund
+ENV QUAREL_LIVEKIT_BIN=/usr/local/bin/livekit-server \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENTRYPOINT ["bash", "test/e2e/voice.sh"]

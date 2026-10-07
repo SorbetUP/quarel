@@ -29,8 +29,13 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - run: make build
       - run: go vet ./...
       - run: make test 2>&1 | tee /tmp/go-test.log
+      - name: Targeted Go race checks
+        run: go test -race -timeout 300s ./internal/community ./internal/identity ./internal/realtime
+      - name: Import boundary policy and negative fixtures
+        run: go test ./tools/import-boundaries && go run ./tools/import-boundaries
       - name: Failed tests (annotations, readable without signing in)
         if: failure()
         run: grep -E -- '--- FAIL|_test\.go:[0-9]+|^FAIL|panic:|timed out' /tmp/go-test.log | head -40 | sed 's/^/::error::/'
@@ -61,6 +66,53 @@ jobs:
       - name: Encryption interoperability (vodozemac ↔ goolm)
         run: make client-interop
 
+  containers:
+    name: Docker OCI stack (build, health, dev checks)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build all current product and dev images
+        run: docker compose --profile dev -f deploy/compose/compose.yaml build
+      - name: Start stack and wait for in-container health checks
+        run: docker compose -f deploy/compose/compose.yaml up --detach --wait
+      - name: Assert health state and site response
+        run: |
+          docker compose -f deploy/compose/compose.yaml ps --format json | jq -s -e 'length == 4 and all(.[]; .Health == "healthy")'
+          curl --fail --silent http://127.0.0.1:18000/ | grep -q '<html'
+          curl --fail --silent http://127.0.0.1:18080/v1/health
+          curl --fail --silent http://127.0.0.1:18090/v1/health
+          curl --fail --silent http://127.0.0.1:18095/health
+      - name: Go tests inside the dev image
+        run: docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make test
+      - name: Build, vet and enforce import boundaries inside the dev image
+        run: |
+          docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make build
+          docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make vet
+          docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev go run ./tools/import-boundaries
+      - name: Go race checks inside the dev image
+        run: docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev go test -race -timeout 300s ./internal/community ./internal/identity ./internal/realtime
+      - name: Client checks inside the dev image
+        run: docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make client-test
+      - name: Desktop build inside the dev image
+        run: docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make client-build
+      - name: Encryption interoperability inside the dev image
+        run: docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make client-interop
+      - name: Site build inside the dev image
+        run: docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make site-build
+      - name: Record image ids and architecture
+        run: docker image inspect localhost/quarel-identity:local localhost/quarel-server:local localhost/quarel-docs-mcp:local localhost/quarel-site:local localhost/quarel-dev:local --format '{{.RepoTags}} {{.Id}} {{.Os}}/{{.Architecture}}'
+      - name: Stop stack and remove test data
+        if: always()
+        run: docker compose -f deploy/compose/compose.yaml down --volumes --remove-orphans
+
+  e2e-voice-docker:
+    name: End-to-end voice (Docker, Linux/amd64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make e2e-voice-docker
+
   site:
     name: Site quarel.app
     runs-on: ubuntu-24.04
@@ -74,25 +126,13 @@ jobs:
       - run: make site-build
 
   e2e-servers:
-    name: End-to-end (servers, quarelctl)
+    name: End-to-end (servers, Docker dev image)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - run: sudo apt-get install -y --no-install-recommends sqlite3 python3-cryptography
-      - run: make build
-      - run: test/e2e/dm.sh
-      - run: test/e2e/dm-groups.sh
-      - run: test/e2e/messages.sh
-      - run: test/e2e/moderation.sh
-      - run: test/e2e/accounts.sh
-      - run: test/e2e/security.sh
-      - run: test/e2e/ops.sh
-      - run: test/e2e/calls.sh
-      - run: make discord-import-test
+      - run: docker compose --profile dev -f deploy/compose/compose.yaml build dev
+      - run: docker compose --profile dev -f deploy/compose/compose.yaml run --rm --no-deps dev make e2e-servers
 
   e2e-client:
     name: End-to-end (desktop app, web client, voice)

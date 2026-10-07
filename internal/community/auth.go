@@ -307,7 +307,7 @@ func (s *Server) admit(ctx context.Context, claims *idtoken.Claims, invite, clai
 
 	switch {
 	case m == nil:
-		m = &member{ID: secret.NewID(), Issuer: claims.Issuer, Subject: claims.Subject, Handle: claims.Handle, IsOwner: makeOwner, JoinedAt: now}
+		m = &member{ID: s.ids.NewID(), Issuer: claims.Issuer, Subject: claims.Subject, Handle: claims.Handle, IsOwner: makeOwner, JoinedAt: now}
 		_, err = tx.ExecContext(ctx, `INSERT INTO members (id, issuer, subject, handle, is_owner, joined_at) VALUES (?, ?, ?, ?, ?, ?)`,
 			m.ID, m.Issuer, m.Subject, m.Handle, m.IsOwner, m.JoinedAt)
 		joined = true

@@ -19,6 +19,7 @@ import (
 
 	"github.com/anlekg/quarel/internal/diskspace"
 	"github.com/anlekg/quarel/internal/httpapi"
+	"github.com/anlekg/quarel/internal/platform"
 	"github.com/anlekg/quarel/internal/ratelimit"
 	"github.com/anlekg/quarel/internal/realtime"
 	"github.com/anlekg/quarel/internal/secret"
@@ -180,7 +181,8 @@ type Server struct {
 	signer   *idtoken.Signer
 	mailer   Mailer
 	hub      *realtime.Hub
-	now      func() time.Time
+	now      platform.Clock
+	ids      platform.IDGenerator
 
 	proxies ratelimit.Proxies
 	limit   struct{ global, register, login, email, friends, files, sends, typing, turn, notice, export *ratelimit.Limiter }
@@ -190,6 +192,11 @@ type Server struct {
 
 // Open prepares the data directory, database and signing key.
 func Open(cfg Config) (*Server, error) {
+	return OpenWithIDGenerator(cfg, platform.IDGeneratorFunc(secret.NewID))
+}
+
+// OpenWithIDGenerator opens the service and injects its ordinary-ID adapter.
+func OpenWithIDGenerator(cfg Config, ids platform.IDGenerator) (*Server, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return nil, err
 	}
@@ -211,19 +218,30 @@ func Open(cfg Config) (*Server, error) {
 	if cfg.SMTP.Host != "" {
 		mailer = cfg.SMTP
 	}
-	return New(cfg, db, key, mailer, retired...), nil
+	return NewWithIDGenerator(cfg, db, key, mailer, ids, retired...), nil
 }
 
 // New builds a Server from already-opened dependencies. retired keys are
 // former signing keys still published (see Admin.RotateSigningKey).
 func New(cfg Config, db *sql.DB, key ed25519.PrivateKey, mailer Mailer, retired ...ed25519.PublicKey) *Server {
+	return NewWithIDGenerator(cfg, db, key, mailer, platform.IDGeneratorFunc(secret.NewID), retired...)
+}
+
+// NewWithIDGenerator builds an Identity Server with an injectable ordinary-ID
+// source. Session bearer tokens and cryptographic material keep their own
+// dedicated CSPRNG paths.
+func NewWithIDGenerator(cfg Config, db *sql.DB, key ed25519.PrivateKey, mailer Mailer, ids platform.IDGenerator, retired ...ed25519.PublicKey) *Server {
+	if ids == nil {
+		ids = platform.IDGeneratorFunc(secret.NewID)
+	}
 	s := &Server{
 		cfg:    cfg,
 		db:     db,
 		signer: idtoken.NewSigner(cfg.Issuer, key, retired...),
 		mailer: mailer,
 		hub:    realtime.NewHub(),
-		now:    time.Now,
+		now:    platform.Clock(time.Now),
+		ids:    ids,
 	}
 	s.hub.OnGroup = s.presenceHook
 	s.proxies = cfg.TrustedProxies

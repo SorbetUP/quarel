@@ -132,8 +132,8 @@ func (s *Server) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	actor := memberFrom(r).ID
 	now := s.nowMs()
-	h := webhookJSON{ID: secret.NewID(), ChannelID: c.ID, Name: name, CreatedBy: &actor, CreatedAt: fromMs(now), Token: webhookTokenPrefix + secret.NewToken()}
-	memberID := secret.NewID()
+	h := webhookJSON{ID: s.ids.NewID(), ChannelID: c.ID, Name: name, CreatedBy: &actor, CreatedAt: fromMs(now), Token: webhookTokenPrefix + secret.NewToken()}
+	memberID := s.ids.NewID()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		writeErr(w, r, err)

@@ -6,7 +6,7 @@ set -uo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd); B=$REPO/bin
 D=$(mktemp -d); PIDS=()
 trap 'kill "${PIDS[@]}" 2>/dev/null; rm -rf "$D"' EXIT
-export XDG_CONFIG_HOME=$D/cfg QUAREL_PASSWORD=motdepasse-solide
+export HOME=$D XDG_CONFIG_HOME=$D/cfg QUAREL_PASSWORD=motdepasse-solide
 # Local TURN relay on the loopback address (private peers allowed for the test only).
 QUAREL_RATE_LIMITS=off QUAREL_ADDR=127.0.0.1:28080 QUAREL_ISSUER=localhost:28080 QUAREL_DATA_DIR=$D/id \
   QUAREL_TURN=on QUAREL_UPNP=off QUAREL_TURN_LISTEN=127.0.0.1:13478 QUAREL_TURN_PUBLIC_IP=127.0.0.1 QUAREL_TURN_PORTS=50000-50050 QUAREL_TURN_ALLOW_PRIVATE=1 \

@@ -1,6 +1,11 @@
 bin/
 .git/
+.env*
+.npmrc
+*.pem
+*.key
 *.md
+!THIRD_PARTY_NOTICES.md
 !site/src/content/docs/**/*.md
 **/node_modules/
 client/release/

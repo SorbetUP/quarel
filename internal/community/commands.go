@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/anlekg/quarel/internal/secret"
 )
 
 // Slash commands (P2). A bot declares its commands (PUT /v1/bots/@me/commands);
@@ -238,7 +236,7 @@ func (s *Server) handleRunCommand(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, errf(http.StatusConflict, "bot_offline", "this bot is not connected"))
 		return
 	}
-	id := secret.NewID()
+	id := s.ids.NewID()
 	s.cmds.mu.Lock()
 	if s.cmds.byID == nil {
 		s.cmds.byID = map[string]interaction{}

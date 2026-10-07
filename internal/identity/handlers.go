@@ -150,7 +150,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 				"Bonjour %s,\n\nQuelqu'un vient d'essayer de créer un compte Quarel avec votre adresse, alors que vous en avez déjà un.\n\n"+
 					"Si c'était vous : connectez-vous avec votre pseudo, ou utilisez « Mot de passe oublié ».\nSinon, vous pouvez ignorer ce message : rien n'a changé sur votre compte.\n", existing.Pseudo))
 		}
-		writeJSON(w, http.StatusCreated, map[string]string{"user_id": newID(), "handle": req.Pseudo + "@" + s.cfg.Issuer})
+		writeJSON(w, http.StatusCreated, map[string]string{"user_id": s.ids.NewID(), "handle": req.Pseudo + "@" + s.cfg.Issuer})
 		return
 	}
 	if stale {
@@ -159,7 +159,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	u := &user{ID: newID(), Email: email, Pseudo: req.Pseudo, CreatedAt: s.now().Unix()}
+	u := &user{ID: s.ids.NewID(), Email: email, Pseudo: req.Pseudo, CreatedAt: s.now().Unix()}
 	err = s.insertUser(ctx, u, hash, invite)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") { // lost a race with a concurrent registration
@@ -389,7 +389,7 @@ func (s *Server) openSession(w http.ResponseWriter, r *http.Request, u *user, de
 	ctx := r.Context()
 
 	token := newSecret()
-	sessID := newID()
+	sessID := s.ids.NewID()
 	now := s.now().Unix()
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO sessions (id, user_id, token_hash, device_name, device_key, created_at, last_seen_at)
