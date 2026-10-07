@@ -1,7 +1,7 @@
 # M01 verification record
 
 **Date:** 2026-10-08  
-**Source:** current working tree in `nsb/quarel-m00-baseline`  
+**Source:** `ab9c10070a9982c546f13c1ef6356a99685b9f6d` in `nsb/quarel-m00-baseline`  
 **Gate:** independent integrated review accepted; local verification complete. M01 remains open because remote CI for this branch has not run. All current deployment manifests parse with both Docker Compose v2.39.3 and the selected `podman-compose` 1.6.0 provider; actual Podman runtime compatibility remains unverified and is required at M17/M19.
 
 ## Implementation
@@ -17,15 +17,19 @@
 
 ## Verification evidence
 
-All checks below ran locally in the pinned Docker dev image unless noted.
+All checks ran from this committed source under Docker/Colima. Go/client/site commands used the pinned Linux dev image; Compose stack and voice checks used dedicated OCI images.
 
 - `docker-compose -f deploy/compose/compose.yaml config --quiet` — passed using standalone Docker Compose v2.39.3.
 - Docker Compose v2.39.3 `config --no-env-resolution --no-interpolate --quiet` and podman-compose 1.6.0 `config` both passed for `deploy/identity/compose.yaml`, `deploy/identity/compose.proxy.yaml`, `deploy/server/compose.yaml`, and `deploy/compose/compose.yaml`. Docker Compose was instructed not to resolve env files or interpolate variables, so no `.env` contents were read. Podman parser output retained the quoted `"off"` values as strings. The local dev manifest was corrected to quote these YAML values after parser output showed YAML 1.1 boolean coercion.
-- `docker-compose -f deploy/compose/compose.yaml up -d --build --wait` — all four product/site containers reached `healthy`; the identity, community, docs MCP and site health endpoints each returned success. Compose used the image-provided Identity and community probes.
+- `docker-compose -f deploy/compose/compose.yaml --profile dev build` — all five images built from the committed source using pinned base images.
+- `docker-compose -f deploy/compose/compose.yaml up -d --wait` — all four product/site containers reached `healthy`; the identity, community, docs MCP and site health endpoints each returned success. Compose used the image-provided Identity and community probes.
 - Started the community OCI image with `QUAREL_TLS=self-signed` outside Compose — its image healthcheck also reached `healthy`, verifying the HTTPS probe path as well as Compose's HTTP path.
 - `make e2e-servers` — passed all server scenarios and seven Discord importer tests. A first run exposed missing `curl` in the dev image; `curl` was added and the complete suite then passed.
-- `make test`, `make build`, `make vet`, `go test ./tools/import-boundaries`, `go run ./tools/import-boundaries`, and targeted race checks for `internal/community`, `internal/identity` and `internal/realtime` — passed. The checker inspected 48 internal packages.
+- `make test`, `make test-race`, `make build`, `make vet`, `go test ./tools/import-boundaries`, and `go run ./tools/import-boundaries` — passed inside the committed Linux dev image. The race run covered all Go packages; the boundary checker inspected 48 internal packages.
+- `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` — no vulnerabilities found in called code. The scanner reported one vulnerability in a required module that the code does not appear to call.
 - `make client-test` — 54 tests passed; `make client-build`, `make client-interop`, and `make site-build` passed.
+- `make e2e-servers` — all server scenarios, including calls through TURN, and seven Discord importer tests passed.
+- `make e2e-voice-docker` — passed on Linux/amd64 using Colima 0.9.1 with an arm64 VZ/Rosetta VM. Two Chromium clients exchanged audio/video and screen share, and exercised moderation and LiveKit webhooks without page errors. The test image ID was `sha256:a4eec34e7a450f8aa25a5404e6cebd402eaf65f79f4b3878a6eb9f54bb08e6c0`; embedded LiveKit binary SHA-256 was `defde46e938e431cb23fc92fe793e503034fb5117cfa506796776a818f97afa3`.
 - `go test -run TestSlashCommands -count=1 -v ./internal/community` — passed after the gateway test synchronization fix.
 - `git diff --check` — passed.
 
@@ -33,15 +37,15 @@ An earlier `make test` attempt failed in `TestSlashCommands` because the test is
 
 ## Built image identities
 
-These local images were built for Linux/arm64 on Docker/Colima. They are reproducible local IDs, not published registry references.
+These local images were built for Linux/arm64 on Docker/Colima. The listed local IDs are not published registry references.
 
 | Image | Local image ID |
 |---|---|
-| `localhost/quarel-identity:local` | `sha256:bb98d54c3c6cad75437c5597e7e9640b54fe3237c311b51a2da348f8642b18af` |
-| `localhost/quarel-server:local` | `sha256:5a05b8af88b41f9d76f9012f7c6134bab07028a157d7f2bfa274e1deb10882c9` |
-| `localhost/quarel-docs-mcp:local` | `sha256:d66b33545a2010578145dd00464985288ac7b3de9921bcf837169e4de0d53fd7` |
-| `localhost/quarel-site:local` | `sha256:ccd5f13c03bf85db3cec11459a0c68a141c53134912ab2f852f7856e05627528` |
-| `localhost/quarel-dev:local` | `sha256:300dc1edca27503c5034835cc45acf0e5b65c567f06c1a8a3de50568053ca3de` |
+| `localhost/quarel-identity:local` | `sha256:81bc1d21e5354d65b0363b17688a363fcca9620773fea3d2a08ff522fcd4963a` |
+| `localhost/quarel-server:local` | `sha256:4ed13d95afad19dd647b471f102aae5fba445dc41c0c38b27cc63dde3e0e063c` |
+| `localhost/quarel-docs-mcp:local` | `sha256:7ca53554ce46ee48ba727c2d8c6b7d180f7d000664ea2913a0bbce579a1ca273` |
+| `localhost/quarel-site:local` | `sha256:ee4e01b9bf278ed08922f1caba252c896d2ad87db019dcea40f25c902e5a7219` |
+| `localhost/quarel-dev:local` | `sha256:cd4554190dd99496fea838cda6e2e698092b98595bfc433131de421ba4125a96` |
 
 ## Scope decisions and remaining limits
 
